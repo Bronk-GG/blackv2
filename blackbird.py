@@ -198,12 +198,20 @@ def initiate():
     config.currentUser = None
     config.currentEmail = None
 
-    lines = getLinesFromFile("assets/text/splash.txt")
+    splash_path = os.path.join(basedir, "assets", "text", "splash.txt")
+    lines = getLinesFromFile(splash_path)
     config.splash_line = random.choice(lines) if lines else ""
 
 
 if __name__ == "__main__":
-    initiate()
+    try:
+        initiate()
+    except Exception as e:
+        import traceback
+        print("\n[STARTUP ERROR] The application failed to start:")
+        traceback.print_exc()
+        input("\nPress Enter to exit...")
+        sys.exit(1)
     config.console.print(
         """[red]
     ▄▄▄▄    ██▓    ▄▄▄       ▄████▄   ██ ▄█▀ ▄▄▄▄    ██▓ ██▀███  ▓█████▄ 
