@@ -1,6 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
 
+:: Always run from the directory this .bat lives in
+set "SCRIPT_DIR=%~dp0"
+cd /d "%SCRIPT_DIR%"
+echo Script directory: %SCRIPT_DIR%
+
 echo =========================================
 echo  Building Blackbird OSINT Executable...
 echo =========================================
@@ -20,72 +25,80 @@ if exist "blackbird.exe" del /f /q "blackbird.exe"
 echo Done.
 echo.
 
-:: --- STEP 2: Find Python ---
+:: --- STEP 2: Auto-detect Python interpreter ---
 echo [2/5] Locating Python interpreter...
-set PYTHON_CMD=python
-where python >nul 2>nul
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] Python not found in PATH. Please install Python.
-    pause
-    exit /b 1
-)
-for /f "tokens=*" %%i in ('python -c "import sys; print(sys.executable)"') do set PYTHON_EXE=%%i
-echo Found Python: %PYTHON_EXE%
-echo.
+set PYTHON=
 
-:: --- STEP 3: Ensure dependencies are installed ---
-echo [3/5] Installing/verifying Python dependencies...
-python -m pip install --quiet -r requirements.txt
-if %ERRORLEVEL% NEQ 0 (
-    echo [WARNING] Some pip installs may have failed. Continuing...
-)
-
-:: Ensure Playwright browsers are installed for the build environment
-echo Installing playwright chromium for build environment (only needed once)...
-python -m playwright install chromium
-echo Done.
-echo.
-
-:: --- STEP 4: Locate PyInstaller executable ---
-echo [4/5] Locating PyInstaller executable...
-
-:: Try standard PATH first
-where pyinstaller >nul 2>nul
-if %ERRORLEVEL% EQU 0 set PYINSTALLER_EXE=pyinstaller
-
-:: Dynamically resolve from current Python user site-packages if not found in PATH
-if not defined PYINSTALLER_EXE (
-    for /f "tokens=*" %%i in ('python -c "import os,site; s=site.getusersitepackages(); print(os.path.join(os.path.dirname(s),'Scripts','pyinstaller.exe'))"') do set PYINSTALLER_EXE=%%i
-    if not exist "!PYINSTALLER_EXE!" set PYINSTALLER_EXE=
-)
-
-:: Install if still not found
-if not defined PYINSTALLER_EXE (
-    echo PyInstaller not found, installing via pip...
-    python -m pip install pyinstaller
-    for /f "tokens=*" %%i in ('python -c "import os,site; s=site.getusersitepackages(); print(os.path.join(os.path.dirname(s),'Scripts','pyinstaller.exe'))"') do set PYINSTALLER_EXE=%%i
-    if not exist "!PYINSTALLER_EXE!" (
-        echo [ERROR] Cannot locate pyinstaller.exe after installation.
-        echo Run manually: pip install pyinstaller
-        pause
-        exit /b 1
+:: Try common options in order of preference
+for %%P in (python py "py -3.13" "py -3.12" "py -3.14" "py -3.11") do (
+    if not defined PYTHON (
+        %%P --version >nul 2>&1
+        if !ERRORLEVEL! EQU 0 set PYTHON=%%P
     )
 )
 
-echo Found: !PYINSTALLER_EXE!
+if not defined PYTHON (
+    echo [ERROR] No Python installation found in PATH.
+    echo         Please install Python from https://python.org
+    pause
+    exit /b 1
+)
+
+for /f "tokens=*" %%i in ('!PYTHON! -c "import sys; print(sys.executable)"') do set PYTHON_EXE=%%i
+for /f "tokens=*" %%v in ('!PYTHON! -c "import sys; print(sys.version.split()[0])"') do set PYTHON_VER=%%v
+echo Found Python !PYTHON_VER!: %PYTHON_EXE%
+echo.
+
+:: --- STEP 3: Install dependencies ---
+echo [3/5] Installing/verifying Python dependencies...
+
+:: Install everything except aiohttp first
+!PYTHON! -m pip install --quiet -r requirements.txt --ignore-requires-python
+
+:: aiohttp may fail to compile C extensions if MSVC is missing.
+:: Try pre-built binary wheel first, then fall back to pure-python mode.
+!PYTHON! -m pip install --quiet "aiohttp>=3.9" --only-binary :all: 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo [WARNING] aiohttp binary wheel not found, trying source install...
+    !PYTHON! -m pip install --quiet "aiohttp>=3.9"
+)
+
+:: Install playwright
+!PYTHON! -m pip install --quiet "playwright>=1.50.0"
+echo Installing Playwright Chromium browser (only needed once)...
+!PYTHON! -m playwright install chromium
+echo Done.
+echo.
+
+:: --- STEP 4: Install PyInstaller ---
+echo [4/5] Installing PyInstaller...
+!PYTHON! -m pip install --quiet pyinstaller
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] Failed to install PyInstaller.
+    pause
+    exit /b 1
+)
+echo PyInstaller ready.
 echo.
 
 :: --- STEP 5: Run Build ---
 echo [5/5] Running PyInstaller with blackbird.spec...
 echo.
 
-:: Tell Playwright where to look for browsers at runtime inside the .exe
-:: (The exe sets this itself via sys.frozen, but we also set it here so the spec resolves correctly)
-for /f "tokens=*" %%i in ('python -c "import os,site; s=site.getusersitepackages(); print(os.path.join(os.path.dirname(s),'site-packages','playwright','driver'))"') do set PLAYWRIGHT_DRIVER_PATH=%%i
+:: Resolve Playwright driver path for the spec
+for /f "tokens=*" %%i in ('!PYTHON! -c "import os, playwright; print(os.path.join(os.path.dirname(playwright.__file__), 'driver'))"') do set PLAYWRIGHT_DRIVER_PATH=%%i
 echo Playwright driver path: !PLAYWRIGHT_DRIVER_PATH!
 echo.
 
-"!PYINSTALLER_EXE!" blackbird.spec
+:: Guard: make sure blackbird.spec is present before running
+if not exist "%SCRIPT_DIR%blackbird.spec" (
+    echo [ERROR] blackbird.spec not found in: %SCRIPT_DIR%
+    echo         Make sure you are running build.bat from the blackbird project folder.
+    pause
+    exit /b 1
+)
+
+!PYTHON! -m PyInstaller "%SCRIPT_DIR%blackbird.spec"
 
 if %ERRORLEVEL% EQU 0 (
     echo.
