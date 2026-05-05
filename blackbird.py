@@ -8,13 +8,29 @@ import random
 import time
 from rich.live import Live
 from rich.text import Text
+import sys
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        pass
 
+if getattr(sys, 'frozen', False):
+    basedir = sys._MEIPASS
+    src_dir = os.path.join(basedir, 'src')
+    sys.path.insert(0, basedir)
+    sys.path.insert(0, src_dir)
+else:
+    basedir = os.path.dirname(__file__)
+    src_dir = os.path.join(basedir, "src")
+    sys.path.insert(0, src_dir)
 import config
 from modules.whatsmyname.list_operations import checkUpdates
 from modules.core.username import verifyUsername
 from modules.core.email import verifyEmail
+from modules.core.ip import verifyIP
 from modules.utils.userAgent import getRandomUserAgent
 from modules.export.file_operations import createSaveDirectory
 from modules.export.csv import saveToCsv
@@ -51,6 +67,16 @@ def initiate():
         "-uf",
         "--username-file",
         help="The list of usernames to be searched.",
+    )
+    parser.add_argument(
+        "--ip",
+        nargs="*",
+        type=str,
+        help="One or more IP addresses to track.",
+    )
+    parser.add_argument(
+        "--ip-file",
+        help="The list of IP addresses to track.",
     )
     parser.add_argument(
         "--permute",
@@ -152,6 +178,8 @@ def initiate():
     config.max_concurrent_requests = args.max_concurrent_requests
     config.email = args.email
     config.email_file = args.email_file
+    config.ip = args.ip
+    config.ip_file = args.ip_file
     config.no_update = args.no_update
     config.about = args.about
     config.instagram_session_id = os.getenv("INSTAGRAM_SESSION_ID")
@@ -192,7 +220,7 @@ if __name__ == "__main__":
     [/red]"""
     )
     config.console.print(
-        f"             [white]{config.splash_line}[/white] | by [red]Lucas Antoniaci[/red]"
+        f"             [white]{config.splash_line}[/white] | by [red]IlIonlygangsIlI[/red]"
     )
 
     if config.about:
@@ -205,143 +233,199 @@ if __name__ == "__main__":
         )
         sys.exit()
 
-    if (
+    is_interactive = (
         not config.username
         and not config.email
+        and not config.ip
         and not config.username_file
         and not config.email_file
+        and not config.ip_file
         and not config.setup_ai
-    ):
-        config.console.print("Either --username or --email is required")
-        sys.exit()
-    if not config.username and (config.permute or config.permuteall):
-        config.console.print("Permutations requires --username")
-        sys.exit()
+    )
 
-    if config.no_update:
-        config.console.print(":next_track_button:  Skipping update...")
-    else:
-        checkUpdates(config)
+    while True:
+        if is_interactive:
+            config.username = None
+            config.email = None
+            config.ip = None
 
-    if config.ai:
-        config.console.print("[yellow1]:exclamation: By proceeding, you consent to share the found site names with Blackbird AI for analysis.[/yellow1] [Y/n]", end="")
-        confirm = input(" > ").strip().lower()
-
-        if confirm not in ["", "y"]:
-            config.console.print(":stop_sign:  Cancelled by user.")
-            sys.exit()
-
-        from modules.ai.key_manager import load_api_key_from_file
-        apikey = load_api_key_from_file(config)
-        if not apikey:
-            config.console.print(
-                ":x: No API Key found. Please run with --setup-ai to configure the API Key."
-            )
-            sys.exit()
-
-    if config.setup_ai:
-        config.console.print("[yellow1]:exclamation: By continuing, you acknowledge that your IP is registered for API key management and abuse prevention.[/yellow1] [Y/n]", end="")
-        confirm = input(" > ").strip().lower()
-
-        if confirm not in ["", "y"]:
-            config.console.print(":stop_sign:  Cancelled by user.")
-            sys.exit()
-
-        from modules.ai.key_manager import fetch_api_key_from_server
-        result = fetch_api_key_from_server(config)
-        if not result:
-            config.console.print(
-                ":x: Failed to fetch API Key. Please check your internet connection or try again later."
-            )
-        sys.exit()
-
-    if config.username_file:
-        if isFile(config.username_file):
-            config.username = getLinesFromFile(config.username_file)
-            config.console.print(
-                f':glasses: Successfully loaded {len(config.username)} usernames from "{config.username_file}"'
-            )
-        else:
-            config.console.print(f'❌ Could not read file "{config.username_file}"')
-            sys.exit()
-
-    if config.username:
-        if (config.permute or config.permuteall) and len(config.username) > 1:
-            elements = " ".join(config.username)
-            way = "all" if config.permuteall else "strict"
-            permute = Permute(config.username)
-            config.username = permute.gather(way)
-            config.console.print(
-                f":glasses: Successfully loaded {len(config.username)} usernames from permuting {elements}"
-            )
-        for user in config.username:
-            config.currentUser = user
-            if config.dump or config.csv or config.pdf or config.json:
-                createSaveDirectory(config)
-            verifyUsername(config.currentUser, config)
-            if config.ai:
-                if len(config.usernameFoundAccounts) > 2:
-                    from modules.ai.client import send_prompt
-                    site_names = [account.get("name", "") for account in config.usernameFoundAccounts]
-                    if (site_names):
-                        prompt = ", ".join(site_names)
-
-                        data = send_prompt(prompt, config)
-
-                        if (data):
-                            config.ai_analysis = data
+            config.console.print("\n[cyan1]Please select an option:[/cyan1]")
+            config.console.print("[white]1.[/white] Search Username")
+            config.console.print("[white]2.[/white] Search Email")
+            config.console.print("[white]3.[/white] Track IP")
+            config.console.print("[white]4.[/white] Exit")
+            
+            choice = input("\n > ").strip()
+            
+            if choice == "1":
+                target = input("Enter username: ").strip()
+                if target:
+                    config.username = [target]
                 else:
-                    config.console.print(
-                        ":warning: Not enough accounts found for AI analysis. Skipping AI features."
-                    )
+                    continue
+            elif choice == "2":
+                target = input("Enter email: ").strip()
+                if target:
+                    config.email = [target]
+                else:
+                    continue
+            elif choice == "3":
+                target = input("Enter IP Address: ").strip()
+                if target:
+                    config.ip = [target]
+                else:
+                    continue
+            elif choice == "4":
+                sys.exit()
+            else:
+                config.console.print("[red]Invalid selection, please try again.[/red]")
+                continue
 
-            if config.csv and config.usernameFoundAccounts:
-                saveToCsv(config.usernameFoundAccounts, config)
-            if config.pdf and config.usernameFoundAccounts:
-                saveToPdf(config.usernameFoundAccounts, "username", config)
-            if config.json and config.usernameFoundAccounts:
-                saveToJson(config.usernameFoundAccounts, config)
-
-            config.currentUser = None
-            config.usernameFoundAccounts = None
-
-    if config.email_file:
-        if isFile(config.email_file):
-            config.email = getLinesFromFile(config.email_file)
-            config.console.print(
-                f':glasses: Successfully loaded {len(config.email)} emails from "{config.email_file}"'
-            )
-        else:
-            config.console.print(f'❌ Could not read file "{config.email_file}"')
+        if not config.username and (config.permute or config.permuteall):
+            config.console.print("Permutations requires --username")
             sys.exit()
 
-    if config.email:
-        for email in config.email:
-            config.currentEmail = email
-            if config.dump or config.csv or config.pdf or config.json:
-                createSaveDirectory(config)
-            verifyEmail(email, config)
-            if config.ai:
-                if len(config.emailFoundAccounts) > 2:
-                    from modules.ai.client import send_prompt
-                    site_names = [account.get("name", "") for account in config.emailFoundAccounts]
-                    if (site_names):
-                        prompt = ", ".join(site_names)
-                        
-                        data = send_prompt(prompt, config)
+        if config.no_update:
+            config.console.print(":next_track_button:  Skipping update...")
+        else:
+            checkUpdates(config)
 
-                        if (data):
-                            config.ai_analysis = data
-                else:
-                    config.console.print(
-                        ":warning: Not enough accounts found for AI analysis. Skipping AI features."
-                    )
+        if config.ai:
+            config.console.print("[yellow1]:exclamation: By proceeding, you consent to share the found site names with Blackbird AI for analysis.[/yellow1] [Y/n]", end="")
+            confirm = input(" > ").strip().lower()
 
-            if config.csv and config.emailFoundAccounts:
-                saveToCsv(config.emailFoundAccounts, config)
-            if config.pdf and config.emailFoundAccounts:
-                saveToPdf(config.emailFoundAccounts, "email", config)
-            if config.json and config.emailFoundAccounts:
-                saveToJson(config.emailFoundAccounts, config)
-            config.currentEmail = None
-            config.emailFoundAccounts = None
+            if confirm not in ["", "y"]:
+                config.console.print(":stop_sign:  Cancelled by user.")
+                sys.exit()
+
+            from modules.ai.key_manager import load_api_key_from_file
+            apikey = load_api_key_from_file(config)
+            if not apikey:
+                config.console.print(
+                    ":x: No API Key found. Please run with --setup-ai to configure the API Key."
+                )
+                sys.exit()
+
+        if config.setup_ai:
+            config.console.print("[yellow1]:exclamation: By continuing, you acknowledge that your IP is registered for API key management and abuse prevention.[/yellow1] [Y/n]", end="")
+            confirm = input(" > ").strip().lower()
+
+            if confirm not in ["", "y"]:
+                config.console.print(":stop_sign:  Cancelled by user.")
+                sys.exit()
+
+            from modules.ai.key_manager import fetch_api_key_from_server
+            result = fetch_api_key_from_server(config)
+            if not result:
+                config.console.print(
+                    ":x: Failed to fetch API Key. Please check your internet connection or try again later."
+                )
+            sys.exit()
+
+        if config.username_file:
+            if isFile(config.username_file):
+                config.username = getLinesFromFile(config.username_file)
+                config.console.print(
+                    f':glasses: Successfully loaded {len(config.username)} usernames from "{config.username_file}"'
+                )
+            else:
+                config.console.print(f'❌ Could not read file "{config.username_file}"')
+                sys.exit()
+
+        if config.username:
+            if (config.permute or config.permuteall) and len(config.username) > 1:
+                elements = " ".join(config.username)
+                way = "all" if config.permuteall else "strict"
+                permute = Permute(config.username)
+                config.username = permute.gather(way)
+                config.console.print(
+                    f":glasses: Successfully loaded {len(config.username)} usernames from permuting {elements}"
+                )
+            for user in config.username:
+                config.currentUser = user
+                if config.dump or config.csv or config.pdf or config.json:
+                    createSaveDirectory(config)
+                verifyUsername(config.currentUser, config)
+                if config.ai:
+                    if len(config.usernameFoundAccounts) > 2:
+                        from modules.ai.client import send_prompt
+                        site_names = [account.get("name", "") for account in config.usernameFoundAccounts]
+                        if (site_names):
+                            prompt = ", ".join(site_names)
+
+                            data = send_prompt(prompt, config)
+
+                            if (data):
+                                config.ai_analysis = data
+                    else:
+                        config.console.print(
+                            ":warning: Not enough accounts found for AI analysis. Skipping AI features."
+                        )
+
+                if config.csv and config.usernameFoundAccounts:
+                    saveToCsv(config.usernameFoundAccounts, config)
+                if config.pdf and config.usernameFoundAccounts:
+                    saveToPdf(config.usernameFoundAccounts, "username", config)
+                if config.json and config.usernameFoundAccounts:
+                    saveToJson(config.usernameFoundAccounts, config)
+
+                config.currentUser = None
+                config.usernameFoundAccounts = None
+
+        if config.email_file:
+            if isFile(config.email_file):
+                config.email = getLinesFromFile(config.email_file)
+                config.console.print(
+                    f':glasses: Successfully loaded {len(config.email)} emails from "{config.email_file}"'
+                )
+            else:
+                config.console.print(f'❌ Could not read file "{config.email_file}"')
+                sys.exit()
+
+        if config.email:
+            for email in config.email:
+                config.currentEmail = email
+                if config.dump or config.csv or config.pdf or config.json:
+                    createSaveDirectory(config)
+                verifyEmail(email, config)
+                if config.ai:
+                    if len(config.emailFoundAccounts) > 2:
+                        from modules.ai.client import send_prompt
+                        site_names = [account.get("name", "") for account in config.emailFoundAccounts]
+                        if (site_names):
+                            prompt = ", ".join(site_names)
+
+                            data = send_prompt(prompt, config)
+
+                            if (data):
+                                config.ai_analysis = data
+                    else:
+                        config.console.print(
+                            ":warning: Not enough accounts found for AI analysis. Skipping AI features."
+                        )
+
+                if config.csv and config.emailFoundAccounts:
+                    saveToCsv(config.emailFoundAccounts, config)
+                if config.pdf and config.emailFoundAccounts:
+                    saveToPdf(config.emailFoundAccounts, "email", config)
+                if config.json and config.emailFoundAccounts:
+                    saveToJson(config.emailFoundAccounts, config)
+                config.currentEmail = None
+                config.emailFoundAccounts = None
+
+        if config.ip_file:
+            if isFile(config.ip_file):
+                config.ip = getLinesFromFile(config.ip_file)
+                config.console.print(
+                    f':glasses: Successfully loaded {len(config.ip)} IPs from "{config.ip_file}"'
+                )
+            else:
+                config.console.print(f'❌ Could not read file "{config.ip_file}"')
+                sys.exit()
+
+        if config.ip:
+            for ip in config.ip:
+                verifyIP(ip, config)
+
+        if not is_interactive:
+            break

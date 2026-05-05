@@ -1,4 +1,11 @@
 import os
+import sys
+
+# PyInstaller compatibility path generator
+if getattr(sys, 'frozen', False):
+    BASE_DIR = sys._MEIPASS
+else:
+    BASE_DIR = os.getcwd()
 
 # List directory
 LIST_DIRECTORY = "data"
@@ -8,15 +15,15 @@ USERNAME_LIST_URL = (
     "https://raw.githubusercontent.com/WebBreacher/WhatsMyName/main/wmn-data.json"
 )
 USERNAME_LIST_FILENAME = "wmn-data.json"
-USERNAME_LIST_PATH = os.path.join(os.getcwd(), LIST_DIRECTORY, USERNAME_LIST_FILENAME)
+USERNAME_LIST_PATH = os.path.join(BASE_DIR, LIST_DIRECTORY, USERNAME_LIST_FILENAME)
 USERNAME_METADATA_LIST_FILENAME = "wmn-metadata.json"
 USERNAME_METADATA_LIST_PATH = os.path.join(
-    os.getcwd(), LIST_DIRECTORY, USERNAME_METADATA_LIST_FILENAME
+    BASE_DIR, LIST_DIRECTORY, USERNAME_METADATA_LIST_FILENAME
 )
 
 # Email List
 EMAIL_LIST_FILENAME = "email-data.json"
-EMAIL_LIST_PATH = os.path.join(os.getcwd(), LIST_DIRECTORY, EMAIL_LIST_FILENAME)
+EMAIL_LIST_PATH = os.path.join(BASE_DIR, LIST_DIRECTORY, EMAIL_LIST_FILENAME)
 
 # Logs
 LOG_DIRECTORY = "logs"

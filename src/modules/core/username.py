@@ -20,6 +20,7 @@ from ..utils.http_client import do_async_request
 from ..utils.log import logError
 from ..export.dump import dumpContent
 from ..sites.instagram import get_instagram_account_info
+from ..sites.r6siege import get_r6_stats
 
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
@@ -152,6 +153,10 @@ async def fetchResults(username, config):
                 result = await coro
                 results.append(result)
                 live.update(render())
+
+        # Fetch R6 stats separately as they require specialized scraping
+        r6_results = await get_r6_stats(username, session, config)
+        results.extend(r6_results)
 
         return {"results": results, "username": username}
 

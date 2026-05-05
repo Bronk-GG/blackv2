@@ -2,12 +2,15 @@ import os
 import sys
 import json
 
-sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
+if getattr(sys, 'frozen', False):
+    sys.path.insert(0, os.path.join(sys._MEIPASS, 'src'))
+else:
+    sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 
-from utils.http_client import do_sync_request
-from utils.hash import hashJSON
-from utils.log import logError
+from modules.utils.http_client import do_sync_request
+from modules.utils.hash import hashJSON
+from modules.utils.log import logError
 
 
 # Read list file and return content

@@ -10,7 +10,7 @@ def logError(e, message, config):
     
     logging.error(f"{message} | {error}")
     logging.error(stacktrace)
-    if config.verbose:
-        config.console.print(f"⛔  {message}")
+    if config and hasattr(config, 'console'):
+        config.console.print(f"!! {message}")
         config.console.print("     | An error occurred:")
         config.console.print(f"     | {error}")
