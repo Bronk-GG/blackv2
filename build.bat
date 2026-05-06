@@ -85,6 +85,24 @@ echo.
 echo [5/5] Running PyInstaller with blackbird.spec...
 echo.
 
+:: Verify critical packages are importable before wasting time on a broken build
+echo Verifying key packages...
+!PYTHON! -c "import rich; import aiohttp; import bs4; import dotenv; import playwright" 2>nul
+if %ERRORLEVEL% NEQ 0 (
+    echo.
+    echo [ERROR] One or more required packages failed to import.
+    echo         Re-running pip install to fix...
+    !PYTHON! -m pip install --quiet rich aiohttp beautifulsoup4 python-dotenv playwright
+    !PYTHON! -c "import rich; import aiohttp; import bs4; import dotenv; import playwright"
+    if !ERRORLEVEL! NEQ 0 (
+        echo [ERROR] Package install failed. Check your internet connection.
+        pause
+        exit /b 1
+    )
+)
+echo All packages OK.
+echo.
+
 :: Resolve Playwright driver path for the spec
 for /f "tokens=*" %%i in ('!PYTHON! -c "import os, playwright; print(os.path.join(os.path.dirname(playwright.__file__), 'driver'))"') do set PLAYWRIGHT_DRIVER_PATH=%%i
 echo Playwright driver path: !PLAYWRIGHT_DRIVER_PATH!
@@ -98,7 +116,15 @@ if not exist "%SCRIPT_DIR%blackbird.spec" (
     exit /b 1
 )
 
-!PYTHON! -m PyInstaller "%SCRIPT_DIR%blackbird.spec"
+:: --collect-all forces PyInstaller to bundle every submodule + data file for
+:: each package. This overrides any hook conflicts in pyinstaller-hooks-contrib.
+!PYTHON! -m PyInstaller "%SCRIPT_DIR%blackbird.spec" ^
+    --collect-all rich ^
+    --collect-all aiohttp ^
+    --collect-all bs4 ^
+    --collect-all soupsieve ^
+    --collect-all dotenv ^
+    --collect-all playwright
 
 if %ERRORLEVEL% EQU 0 (
     echo.
