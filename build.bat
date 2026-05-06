@@ -116,15 +116,8 @@ if not exist "%SCRIPT_DIR%blackbird.spec" (
     exit /b 1
 )
 
-:: --collect-all forces PyInstaller to bundle every submodule + data file for
-:: each package. This overrides any hook conflicts in pyinstaller-hooks-contrib.
-!PYTHON! -m PyInstaller "%SCRIPT_DIR%blackbird.spec" ^
-    --collect-all rich ^
-    --collect-all aiohttp ^
-    --collect-all bs4 ^
-    --collect-all soupsieve ^
-    --collect-all dotenv ^
-    --collect-all playwright
+:: --collect-all is invalid when using a .spec file; collection is handled inside the spec.
+!PYTHON! -m PyInstaller "%SCRIPT_DIR%blackbird.spec"
 
 if %ERRORLEVEL% EQU 0 (
     echo.
