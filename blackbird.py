@@ -1,15 +1,40 @@
+# ── Early log setup ─────────────────────────────────────────────────────────
+# Uses stdlib ONLY so failures in third-party imports are still captured.
 import os
-import argparse
-from rich.console import Console
-import logging
 import sys
+import traceback
 from datetime import datetime
-import random
-import time
-from rich.live import Live
-from rich.text import Text
-import sys
 
+def _get_exe_dir():
+    """Return the directory that contains the exe (frozen) or this script (dev)."""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
+
+_LOG_PATH = os.path.join(_get_exe_dir(), "blackbird_log.txt")
+
+def _log(msg: str):
+    """Append a timestamped message to blackbird_log.txt."""
+    try:
+        with open(_LOG_PATH, "a", encoding="utf-8") as _f:
+            _f.write(msg + "\n")
+    except Exception:
+        pass  # never crash trying to log
+
+def _excepthook(exc_type, exc_value, exc_tb):
+    """Catch any otherwise-unhandled exception and write it to the log."""
+    msg = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+    _log(f"\n[UNHANDLED EXCEPTION]\n{msg}")
+    sys.__excepthook__(exc_type, exc_value, exc_tb)
+
+sys.excepthook = _excepthook
+
+# Write a startup marker every time the exe launches
+_log(f"\n{'='*60}")
+_log(f"  Blackbird started  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+_log(f"{'='*60}")
+
+# ── Platform / encoding ──────────────────────────────────────────────────────
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding='utf-8')
@@ -17,6 +42,7 @@ if sys.platform == "win32":
     except AttributeError:
         pass
 
+# ── Path setup ───────────────────────────────────────────────────────────────
 if getattr(sys, 'frozen', False):
     basedir = sys._MEIPASS
     src_dir = os.path.join(basedir, 'src')
@@ -26,21 +52,43 @@ else:
     basedir = os.path.dirname(__file__)
     src_dir = os.path.join(basedir, "src")
     sys.path.insert(0, src_dir)
-import config
-from modules.whatsmyname.list_operations import checkUpdates
-from modules.core.username import verifyUsername
-from modules.core.email import verifyEmail
-from modules.core.ip import verifyIP
-from modules.utils.userAgent import getRandomUserAgent
-from modules.export.file_operations import createSaveDirectory
-from modules.export.csv import saveToCsv
-from modules.export.pdf import saveToPdf
-from modules.export.json import saveToJson
-from modules.utils.file_operations import isFile, getLinesFromFile
-from modules.utils.permute import Permute
-from dotenv import load_dotenv
 
-load_dotenv()
+_log(f"[PATH] basedir={basedir}")
+_log(f"[PATH] src_dir={src_dir}")
+
+# ── Third-party / project imports ────────────────────────────────────────────
+try:
+    import argparse
+    import logging
+    import random
+    import time
+
+    from rich.console import Console
+    from rich.live import Live
+    from rich.text import Text
+
+    import config
+    from modules.whatsmyname.list_operations import checkUpdates
+    from modules.core.username import verifyUsername
+    from modules.core.email import verifyEmail
+    from modules.core.ip import verifyIP
+    from modules.utils.userAgent import getRandomUserAgent
+    from modules.export.file_operations import createSaveDirectory
+    from modules.export.csv import saveToCsv
+    from modules.export.pdf import saveToPdf
+    from modules.export.json import saveToJson
+    from modules.utils.file_operations import isFile, getLinesFromFile
+    from modules.utils.permute import Permute
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    _log("[OK] All imports succeeded")
+
+except Exception as _import_err:
+    _log(f"\n[IMPORT ERROR]\n{traceback.format_exc()}")
+    print(f"\n[STARTUP ERROR] A module failed to load. See blackbird_log.txt for details.\n{_import_err}")
+    input("\nPress Enter to exit...")
+    sys.exit(1)
 
 
 def initiate():
