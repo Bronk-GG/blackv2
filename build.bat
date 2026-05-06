@@ -29,8 +29,9 @@ echo.
 echo [2/5] Locating Python interpreter...
 set PYTHON=
 
-:: Try common options in order of preference
-for %%P in (python py "py -3.13" "py -3.12" "py -3.14" "py -3.11") do (
+:: Prefer Python 3.11/3.12 — they have prebuilt aiohttp wheels.
+:: Python 3.13+ requires MSVC to build aiohttp from source.
+for %%P in ("py -3.11" "py -3.12" "py -3.13" python py "py -3.14") do (
     if not defined PYTHON (
         %%P --version >nul 2>&1
         if !ERRORLEVEL! EQU 0 set PYTHON=%%P
@@ -47,13 +48,23 @@ if not defined PYTHON (
 for /f "tokens=*" %%i in ('!PYTHON! -c "import sys; print(sys.executable)"') do set PYTHON_EXE=%%i
 for /f "tokens=*" %%v in ('!PYTHON! -c "import sys; print(sys.version.split()[0])"') do set PYTHON_VER=%%v
 echo Found Python !PYTHON_VER!: %PYTHON_EXE%
+if "!PYTHON_VER:~0,4!"=="3.14" (
+    echo.
+    echo [WARNING] Python 3.14 detected. aiohttp has no prebuilt wheel for 3.14.
+    echo           Build may fail. Install Python 3.11 or 3.12 for best results.
+    echo.
+)
 echo.
 
 :: --- STEP 3: Install dependencies ---
 echo [3/5] Installing/verifying Python dependencies...
 
-:: Install everything except aiohttp first
-!PYTHON! -m pip install --quiet -r requirements.txt --ignore-requires-python
+:: Install requirements; aiohttp may fail on Python 3.13+ without MSVC.
+:: We install it separately so a single failure doesn't abort everything else.
+!PYTHON! -m pip install --quiet -r requirements.txt --ignore-requires-python --ignore-installed 2>nul
+
+:: Explicitly install critical packages in case requirements.txt was aborted early
+!PYTHON! -m pip install --quiet requests urllib3 certifi idna chardet charset-normalizer python-dotenv rich beautifulsoup4 soupsieve pillow reportlab
 
 :: aiohttp may fail to compile C extensions if MSVC is missing.
 :: Try pre-built binary wheel first, then fall back to pure-python mode.
