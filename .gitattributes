@@ -1,0 +1,23 @@
+# Auto-detect text files and normalize line endings
+* text=auto
+
+# Windows batch/cmd files must use CRLF
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# Python/JS/config files — normalize to LF
+*.py    text eol=lf
+*.js    text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.txt   text eol=lf
+*.yaml  text eol=lf
+*.yml   text eol=lf
+*.env   text eol=lf
+
+# Binary files — no line-ending conversion
+*.exe   binary
+*.png   binary
+*.jpg   binary
+*.ico   binary
