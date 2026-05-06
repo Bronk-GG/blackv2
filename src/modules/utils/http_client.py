@@ -2,6 +2,8 @@ import requests
 import sys
 import os
 import chardet
+import aiohttp
+import traceback
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "."))
 
@@ -50,17 +52,29 @@ async def do_async_request(method, url, session, config, data=None, customHeader
         headers.update(customHeaders)
     proxy = config.proxy if config.proxy else None
     try:
-        response = await session.request(
-            method,
-            url,
+        # aiohttp.ClientTimeout required in aiohttp >= 3.x (plain int is not accepted)
+        timeout = aiohttp.ClientTimeout(total=config.timeout)
+
+        request_kwargs = dict(
+            method=method,
+            url=url,
             proxy=proxy,
-            timeout=config.timeout,
+            timeout=timeout,
             allow_redirects=True,
             ssl=False,
             data=data,
             headers=headers,
-            max_redirects=10,
         )
+        # max_redirects was added in aiohttp 3.10.11 — skip on older installs
+        try:
+            import aiohttp as _aio
+            _ver = tuple(int(x) for x in _aio.__version__.split('.')[:3])
+            if _ver >= (3, 10, 11):
+                request_kwargs['max_redirects'] = 10
+        except Exception:
+            pass
+
+        response = await session.request(**request_kwargs)
 
         json = None
         try:
@@ -90,5 +104,9 @@ async def do_async_request(method, url, session, config, data=None, customHeader
     except Exception as e:
         if config.verbose:
             config.console.print(f"  ❌ Error in Async HTTP Request [{method}] {url}")
-        logError(e, f"Error in Async HTTP Request [{method}] {url}", config)
+        logError(
+            e,
+            f"Error in Async HTTP Request [{method}] {url} | {type(e).__name__}: {e}",
+            config,
+        )
         return None
