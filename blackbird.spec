@@ -76,6 +76,11 @@ _hidden += collect_submodules('aiohttp')
 _hidden += collect_submodules('playwright')
 _hidden += collect_submodules('rich')
 _hidden += collect_submodules('bs4')
+_hidden += collect_submodules('requests')
+_hidden += collect_submodules('urllib3')
+_hidden += collect_submodules('certifi')
+_hidden += collect_submodules('idna')
+_hidden += collect_submodules('charset_normalizer')
 
 # ── Analysis ─────────────────────────────────────────────────────────────────
 a = Analysis(
