@@ -37,15 +37,19 @@ def _find_pkg_dir(name):
     return None
 
 _pure_python_pkgs = [
-    'rich',         # terminal formatting  (pure Python)
-    'bs4',          # BeautifulSoup        (pure Python)
-    'soupsieve',    # CSS selector engine  (pure Python)
-    'dotenv',       # python-dotenv        (pure Python)
-    'markdown_it',  # required by rich     (pure Python)
-    'mdurl',        # required by rich     (pure Python)
-    'pygments',     # required by rich     (pure Python)
-    'certifi',      # SSL certs            (pure Python)
-    'charset_normalizer',  # requests dep  (pure Python)
+    'rich',              # terminal formatting  (pure Python)
+    'bs4',               # BeautifulSoup        (pure Python)
+    'soupsieve',         # CSS selector engine  (pure Python)
+    'dotenv',            # python-dotenv        (pure Python)
+    'markdown_it',       # required by rich     (pure Python)
+    'mdurl',             # required by rich     (pure Python)
+    'pygments',          # required by rich     (pure Python)
+    'certifi',           # SSL certs            (pure Python)
+    'charset_normalizer',# requests dep         (pure Python)
+    'requests',          # HTTP library         (pure Python)
+    'urllib3',           # requests dep         (pure Python)
+    'idna',              # requests dep         (pure Python)
+    'chardet',           # charset detection    (pure Python)
 ]
 
 _direct_datas = []
