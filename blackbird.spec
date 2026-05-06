@@ -9,20 +9,29 @@ from PyInstaller.utils.hooks import collect_all, collect_submodules
 # ── Playwright driver ────────────────────────────────────────────────────────
 PLAYWRIGHT_DRIVER_PATH = os.path.join(os.path.dirname(playwright.__file__), 'driver')
 
-# ── Locate every site-packages directory this Python knows about ─────────────
-# This is the root cause fix: rich is in user site-packages which PyInstaller
-# sometimes misses. Adding all site-packages dirs to pathex guarantees it finds them.
+# ── Ensure ALL site-packages are in sys.path at spec-parse time ──────────────
+# CRITICAL: collect_submodules() and importlib.util.find_spec() run RIGHT NOW
+# at spec-parse time. If user site-packages is not in sys.path, they silently
+# return empty/None for user-installed packages (like rich, requests, etc.).
 _site_dirs = []
 try:
-    _site_dirs += _site.getsitepackages()
+    for _sp in _site.getsitepackages():
+        if _sp not in sys.path:
+            sys.path.insert(0, _sp)
+        if _sp not in _site_dirs:
+            _site_dirs.append(_sp)
 except AttributeError:
     pass
 try:
     _user_site = _site.getusersitepackages()
+    if _user_site not in sys.path:
+        sys.path.insert(0, _user_site)
     if _user_site not in _site_dirs:
         _site_dirs.append(_user_site)
 except AttributeError:
     pass
+
+print(f'[SPEC] sys.path now includes: {_site_dirs}')
 
 # ── Directly copy pure-Python packages as datas ──────────────────────────────
 # Belt-and-suspenders: physically copies the .py files into _MEIPASS/<pkg>
@@ -63,7 +72,7 @@ _datas    = []
 _binaries = []
 _hidden   = []
 
-for _pkg in ['aiohttp', 'playwright']:
+for _pkg in ['aiohttp', 'playwright', 'requests', 'urllib3', 'certifi', 'idna', 'charset_normalizer']:
     try:
         _d, _b, _h = collect_all(_pkg)
         _datas    += _d

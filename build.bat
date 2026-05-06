@@ -116,14 +116,10 @@ if not exist "%SCRIPT_DIR%blackbird.spec" (
     exit /b 1
 )
 
-:: Pass all site-packages dirs to PyInstaller analysis so it finds user-installed packages
-:: (--paths IS valid with a .spec file, unlike --collect-all)
-for /f "tokens=*" %%i in ('!PYTHON! -c "import site; print(site.getusersitepackages())"') do set USER_SITE=%%i
-for /f "tokens=*" %%i in ('!PYTHON! -c "import site; pkgs=site.getsitepackages(); print(pkgs[0] if pkgs else '')"') do set SYS_SITE=%%i
-echo Site-packages: !USER_SITE!
-echo.
+:: --paths is NOT allowed with a .spec file in PyInstaller 6.1.0.
+:: Site-packages injection is handled inside blackbird.spec instead.
+!PYTHON! -m PyInstaller "%SCRIPT_DIR%blackbird.spec"
 
-!PYTHON! -m PyInstaller "%SCRIPT_DIR%blackbird.spec" --paths "!USER_SITE!" --paths "!SYS_SITE!"
 
 if %ERRORLEVEL% EQU 0 (
     echo.
